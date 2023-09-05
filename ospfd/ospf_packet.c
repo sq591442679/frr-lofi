@@ -740,6 +740,7 @@ static void ospf_write(struct thread *thread)
 			iph.ip_ttl = OSPF_VL_IP_TTL;
 		else
 			iph.ip_ttl = OSPF_IP_TTL;
+
 		iph.ip_p = IPPROTO_OSPFIGP;
 		iph.ip_sum = 0;
 		iph.ip_src.s_addr = oi->address->u.prefix4.s_addr;
@@ -1201,6 +1202,15 @@ static void ospf_db_desc_proc(struct stream *s, struct ospf_interface *oi,
 			break;
 		default:
 			break;
+		}
+
+		/**
+		 * @sqsq
+		 * never try to synchronise LSAs that are out of local disseminate range,
+		 * i.e. LSAs whose TTL <= 1
+		 */
+		if (check_time(oi->ospf) && lsah->ttl <= 1) {
+			continue;
 		}
 
 		/* Create LS-request object. */
@@ -2188,7 +2198,7 @@ static void ospf_ls_upd(struct ospf *ospf, struct ip *iph,
 			}
 		}
 
-		/* The database copy is more recent.  If the database copy
+		/* (8) The database copy is more recent.  If the database copy
 		   has LS age equal to MaxAge and LS sequence number equal to
 		   MaxSequenceNumber, simply discard the received LSA without
 		   acknowledging it. (In this case, the LSA's LS sequence number

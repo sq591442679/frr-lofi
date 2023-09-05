@@ -327,7 +327,7 @@ int ospf_flood(struct ospf *ospf, struct ospf_neighbor *nbr,
 
 	oi = nbr->oi;
 
-	/* If there is already a database copy, and if the
+	/* 13 (5)(a) If there is already a database copy, and if the
 	   database copy was received via flooding and installed less
 	   than MinLSArrival seconds ago, discard the new LSA
 	   (without acknowledging it). */
@@ -353,7 +353,7 @@ int ospf_flood(struct ospf *ospf, struct ospf_neighbor *nbr,
 		}
 	}
 
-	/* Flood the new LSA out some subset of the router's interfaces.
+	/* 13 (5)(b) Flood the new LSA out some subset of the router's interfaces.
 	   In some cases (e.g., the state of the receiving interface is
 	   DR and the LSA was received from a router other than the
 	   Backup DR) the LSA will be flooded back out the receiving
@@ -418,7 +418,7 @@ int ospf_flood(struct ospf *ospf, struct ospf_neighbor *nbr,
 		}
 	}
 
-	/* Install the new LSA in the link state database
+	/* 13 (5)(d) Install the new LSA in the link state database
 	   (replacing the current database copy).  This may cause the
 	   routing table calculation to be scheduled.  In addition,
 	   timestamp the new LSA with the current time.  The flooding
@@ -433,7 +433,7 @@ int ospf_flood(struct ospf *ospf, struct ospf_neighbor *nbr,
 	if (lsa_ack_flag)
 		ospf_flood_delayed_lsa_ack(nbr, new);
 
-	/* If this new LSA indicates that it was originated by the
+	/* 13 (5)(f) If this new LSA indicates that it was originated by the
 	   receiving router itself, the router must take special action,
 	   either updating the LSA or in some cases flushing it from
 	   the routing domain. */
@@ -573,7 +573,7 @@ int ospf_flood_through_interface(struct ospf_interface *oi,
 			}
 		}
 
-		/* Add the new LSA to the Link state retransmission list
+		/* 13.3(1)(d) Add the new LSA to the Link state retransmission list
 		   for the adjacency. The LSA will be retransmitted
 		   at intervals until an acknowledgment is seen from
 		   the neighbor. */
@@ -581,7 +581,7 @@ int ospf_flood_through_interface(struct ospf_interface *oi,
 		retx_flag = 1;
 	}
 
-	/* If in the previous step, the LSA was NOT added to any of
+	/* 13.3(2) If in the previous step, the LSA was NOT added to any of
 	   the Link state retransmission lists, there is no need to
 	   flood the LSA out the interface. */
 	if (retx_flag == 0) {
@@ -591,7 +591,7 @@ int ospf_flood_through_interface(struct ospf_interface *oi,
 	/* if we've received the lsa on this interface we need to perform
 	   additional checking */
 	if (inbr && (inbr->oi == oi)) {
-		/* If the new LSA was received on this interface, and it was
+		/* 13.3(3) If the new LSA was received on this interface, and it was
 		   received from either the Designated Router or the Backup
 		   Designated Router, chances are that all the neighbors have
 		   received the LSA already. */
@@ -603,7 +603,7 @@ int ospf_flood_through_interface(struct ospf_interface *oi,
 			return 1;
 		}
 
-		/* If the new LSA was received on this interface, and the
+		/* 13.3(4) If the new LSA was received on this interface, and the
 		   interface state is Backup, examine the next interface.  The
 		   Designated Router will do the flooding on this interface.
 		   However, if the Designated Router fails the router will
@@ -619,7 +619,7 @@ int ospf_flood_through_interface(struct ospf_interface *oi,
 		}
 	}
 
-	/* The LSA must be flooded out the interface. Send a Link State
+	/* 13.3(5) The LSA must be flooded out the interface. Send a Link State
 	   Update packet (including the new LSA as contents) out the
 	   interface.  The LSA's LS age must be incremented by InfTransDelay
 	   (which	must be	> 0) when it is copied into the outgoing Link
@@ -814,7 +814,27 @@ int ospf_flood_through(struct ospf *ospf, struct ospf_neighbor *inbr,
 			zlog_debug("%s: LOCAL NSSA FLOOD of Type-7.", __func__);
 	/* Fallthrough */
 	default:
-		lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa);
+		/**
+		 * @sqsq
+		 * if the ttl of lsa <= 1, then do not flood it out,
+		 * but still need to return 1,
+		 * because the ospf_flood() function needs to send back an LSACK
+		 */
+		vty_out(ospf->vty, "ttl:%d\n", lsa->data->ttl);
+		if (check_time(ospf) && lsa->data->ttl <= 1) {
+			lsa_ack_flag = 1;
+		}
+		else if (check_time(ospf) && lsa->data->ttl > 1) {
+			// copy this lsa and decrease TTL
+			struct ospf_lsa *lsa_dup = ospf_lsa_dup(lsa); 
+			lsa_dup->data->ttl--;
+			lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa_dup);
+		}
+		else {
+			lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa);
+		}
+
+		// lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa);
 		break;
 	}
 

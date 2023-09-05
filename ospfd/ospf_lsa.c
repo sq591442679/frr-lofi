@@ -356,6 +356,11 @@ void lsa_header_set(struct stream *s, uint8_t options, uint8_t type,
 	lsah->adv_router = router_id;
 	lsah->ls_seqnum = htonl(OSPF_INITIAL_SEQUENCE_NUMBER);
 
+	/**
+	 * @sqsq
+	 */
+	lsah->ttl = OSPF_SQSQ_TTL;
+
 	stream_forward_endp(s, OSPF_LSA_HEADER_SIZE);
 }
 

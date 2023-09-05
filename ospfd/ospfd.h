@@ -47,8 +47,13 @@
 #define OSPF_IP_TTL             1
 #define OSPF_VL_IP_TTL          100
 
+/*
+ * sqsq
+ */
+#define OSPF_SQSQ_TTL			2U
+
 /* @sqsq */
-#define WARMUP_PERIOD			60
+#define WARMUP_PERIOD			20
 
 /* Default configuration file name for ospfd. */
 #define OSPF_DEFAULT_CONFIG   "ospfd.conf"
