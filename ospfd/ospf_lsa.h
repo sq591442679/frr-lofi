@@ -48,11 +48,7 @@
 #define OSPF_OPAQUE_AREA_LSA	     10
 #define OSPF_OPAQUE_AS_LSA	     11
 
-// #define OSPF_LSA_HEADER_SIZE	     20U
-/**
- * @sqsq
- */
-#define OSPF_LSA_HEADER_SIZE	     21U
+#define OSPF_LSA_HEADER_SIZE	     20U
 #define OSPF_ROUTER_LSA_LINK_SIZE    12U
 #define OSPF_ROUTER_LSA_TOS_SIZE      4U
 #define OSPF_MAX_LSA_SIZE	   1500U
@@ -71,11 +67,6 @@ struct lsa_header {
 	uint32_t ls_seqnum;
 	uint16_t checksum;
 	uint16_t length;
-
-	/**
-	 * @sqsq
-	 */
-	uint8_t ttl;
 };
 
 struct vertex;
@@ -179,7 +170,13 @@ struct router_lsa_link {
 struct router_lsa {
 	struct lsa_header header;
 	uint8_t flags;
-	uint8_t zero;
+
+	// uint8_t zero;
+	/**
+	 * @sqsq
+	 */
+	uint8_t ttl;
+
 	uint16_t links;
 	struct router_link {
 		struct in_addr link_id;

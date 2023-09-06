@@ -820,19 +820,27 @@ int ospf_flood_through(struct ospf *ospf, struct ospf_neighbor *inbr,
 		 * but still need to return 1,
 		 * because the ospf_flood() function needs to send back an LSACK
 		 */
-		vty_out(ospf->vty, "ttl:%d\n", lsa->data->ttl);
-		if (check_time(ospf) && lsa->data->ttl <= 1) {
-			lsa_ack_flag = 1;
-		}
-		else if (check_time(ospf) && lsa->data->ttl > 1) {
-			// copy this lsa and decrease TTL
-			struct ospf_lsa *lsa_dup = ospf_lsa_dup(lsa); 
-			lsa_dup->data->ttl--;
-			lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa_dup);
+		if (lsa->data->type == OSPF_ROUTER_LSA) {
+			struct router_lsa *tmp_lsa = (struct router_lsa *)(lsa->data);
+			if (check_time(ospf) && tmp_lsa->ttl <= 1) {
+				lsa_ack_flag = 1;
+			}
+			else if (check_time(ospf) && tmp_lsa->ttl > 1) {
+				// copy this lsa and decrease TTL
+				struct ospf_lsa *lsa_dup = ospf_lsa_dup(lsa); 
+				struct router_lsa *tmp_lsa_dup = (struct router_lsa *)(lsa_dup->data);
+				tmp_lsa_dup->ttl--;
+				lsa_dup->data->checksum = ospf_lsa_checksum(lsa_dup->data);  // recalculate the checksum
+				lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa_dup);
+			}
+			else {
+				lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa);
+			}	
 		}
 		else {
 			lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa);
 		}
+		
 
 		// lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa);
 		break;

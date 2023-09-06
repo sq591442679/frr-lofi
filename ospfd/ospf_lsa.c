@@ -356,11 +356,6 @@ void lsa_header_set(struct stream *s, uint8_t options, uint8_t type,
 	lsah->adv_router = router_id;
 	lsah->ls_seqnum = htonl(OSPF_INITIAL_SEQUENCE_NUMBER);
 
-	/**
-	 * @sqsq
-	 */
-	lsah->ttl = OSPF_SQSQ_TTL;
-
 	stream_forward_endp(s, OSPF_LSA_HEADER_SIZE);
 }
 
@@ -728,7 +723,11 @@ void ospf_router_lsa_body_set(struct stream **s, struct ospf_area *area)
 	stream_putc(*s, router_lsa_flags(area));
 
 	/* Set Zero fields. */
-	stream_putc(*s, 0);
+	// stream_putc(*s, 0);
+	/**
+	 * @sqsq
+	 */
+	stream_putc(*s, OSPF_SQSQ_TTL);
 
 	/* Keep pointer to # links. */
 	putp = stream_get_endp(*s);

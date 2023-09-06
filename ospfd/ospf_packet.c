@@ -1206,10 +1206,10 @@ static void ospf_db_desc_proc(struct stream *s, struct ospf_interface *oi,
 
 		/**
 		 * @sqsq
-		 * never try to synchronise LSAs that are out of local disseminate range,
-		 * i.e. LSAs whose TTL <= 1
+		 * never try to synchronise LSAs in Lofi
 		 */
-		if (check_time(oi->ospf) && lsah->ttl <= 1) {
+		if (check_time(oi->ospf)) {
+			vty_out(oi->ospf->vty, "DD discard\n");
 			continue;
 		}
 
