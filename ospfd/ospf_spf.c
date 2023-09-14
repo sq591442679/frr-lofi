@@ -1819,8 +1819,77 @@ void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 			     struct route_table *all_rtrs,
 			     struct route_table *new_rtrs)
 {
-	ospf_spf_calculate(area, area->router_lsa_self, new_table, all_rtrs,
-			   new_rtrs, false, true);
+	/**
+	 * @sqsq
+	 */
+	struct lsa_header *current_lsa = area->router_lsa_self->data;
+	uint8_t *p = (uint8_t *)current_lsa + OSPF_LSA_HEADER_SIZE + 4; // point to the beginning of the first link
+	uint8_t *lim = (uint8_t *)current_lsa + ntohs(current_lsa->length);
+	int lsa_pos = -1, lsa_pos_next = 0, cnt = 0;
+
+	while (p < lim) {
+		struct router_lsa_link *l = (struct router_lsa_link *)p;
+		
+		lsa_pos = lsa_pos_next;
+		lsa_pos_next++;
+
+		p += (OSPF_ROUTER_LSA_LINK_SIZE + l->m[0].tos_count * OSPF_ROUTER_LSA_TOS_SIZE);
+
+		int link_type = l->m[0].type;
+		if (link_type == LSA_LINK_TYPE_POINTOPOINT) {
+			cnt++;
+			struct ospf_lsa * neighbor_lsa = ospf_lsa_lookup(ospf, area, OSPF_ROUTER_LSA, l->link_id, l->link_id);
+			/**
+			 * @sqsq
+			 * found the neighbor's router LSA
+			 * then calculate SPF tree based on it
+			 */
+			if (cnt == 1) {
+				ospf_spf_calculate(area, neighbor_lsa, new_table, all_rtrs, new_rtrs, false, true);
+
+				// zlog_debug("calculating routing table based on upper neighbor");
+
+				for (struct route_node *rn = route_top(new_table); rn; rn = route_next(rn)) {
+					struct ospf_route *or = rn->info;
+					struct listnode *node, *nnode;
+					struct ospf_path *path;
+					struct ospf_interface *oi;
+					if (or != NULL) { // NOTE this judgement is important
+						// zlog_debug("next hop cost: %d", or->cost);
+						int cnt = 0;
+						for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) {
+							cnt++;
+							struct in_addr current_addr = { (l->link_data.s_addr) };
+							// zlog_debug("dest?: %pFX", &(rn->p));
+							// zlog_debug("dest prefix4: %pI4", &((rn->p.u).prefix4));
+							// zlog_debug("origin next hop: %pI4", &(path->nexthop));
+							struct in_addr origin_nexthop = path->nexthop;
+							struct in_addr neighbor_intf_ip = sqsq_get_neighbor_intf_ip(current_addr);
+							path->nexthop = neighbor_intf_ip;
+							// zlog_debug("new next hop: %pI4", &(path->nexthop));
+							// zlog_debug("origin ifindex: %d", path->ifindex);
+							if (oi = ospf_if_lookup_by_local_addr(ospf, NULL, l->link_data)) {
+								path->ifindex = oi->ifp->ifindex;
+								if (!sqsq_ip_prefix_match(rn->p.u.prefix4, current_addr, rn->p.prefixlen)) {
+									// zlog_debug("link cost: %d", ntohs(l->m[0].metric));
+									or->cost += ntohs(l->m[0].metric);
+								}
+								// zlog_debug("new ifindex: %d", path->ifindex);
+							}
+							else {
+								// zlog_debug("no/ such ospf_interface");
+								list_delete_node(or->paths, node);
+							}
+							// zlog_debug("cnt:%d", cnt);
+						}	
+					}
+				}	
+			}
+		}
+	}
+
+	// ospf_spf_calculate(area, area->router_lsa_self, new_table, all_rtrs,
+	// 		   new_rtrs, false, true);
 
 	if (ospf->ti_lfa_enabled)
 		ospf_ti_lfa_compute(area, new_table,

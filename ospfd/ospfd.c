@@ -351,7 +351,8 @@ struct ospf *ospf_new_alloc(unsigned short instance, const char *name, struct vt
 	new->start_time = monotime(NULL);
 	new->vty = vty;
 	// vty_out(new->vty, "NM$L\n");
-	vty_out(new->vty, "monotime: %ld\n", monotime(NULL));
+	// vty_out(new->vty, "monotime: %ld\n", monotime(NULL));
+	zlog_debug("new OSPF instance");
 
 	new->instance = instance;
 	new->router_id.s_addr = htonl(0);
@@ -2366,4 +2367,31 @@ bool check_time(const struct ospf *ospf)
 	else {
 		return false;
 	}
+}
+
+struct in_addr sqsq_get_neighbor_intf_ip(struct in_addr current_ip)
+{
+	// zlog_debug("[%s] current ip: %pI4", __func__, &current_ip);
+
+	struct in_addr ret;
+	unsigned int tail = ntohl(current_ip.s_addr) & 255u;
+	// zlog_debug("tail: %u", tail);
+	assert(tail == 1u || tail == 2u);
+	if (tail == 1) {
+		ret.s_addr = ((unsigned int)((current_ip.s_addr << 8) >> 8) | (2 << 24));
+	}
+	else {
+		ret.s_addr = ((unsigned int)((current_ip.s_addr << 8) >> 8) | (1 << 24));
+	}
+
+	// zlog_debug("ret ip: %pI4", &ret);
+
+	return ret;
+}
+
+bool sqsq_ip_prefix_match(struct in_addr ip1, struct in_addr ip2, int length)
+{
+	in_addr_t ip_value1 = ntohl(ip1.s_addr), ip_value2 = ntohl(ip2.s_addr);
+	int shift = 32 - length;
+	return (ip_value1 >> shift) == (ip_value2 >> shift);
 }

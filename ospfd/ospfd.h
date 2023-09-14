@@ -798,4 +798,11 @@ extern int q_spaces_compare_func(const struct q_space *a,
 */
 extern bool check_time(const struct ospf *ospf);
 
+extern struct in_addr sqsq_get_neighbor_intf_ip(struct in_addr current_ip);
+
+/**
+ * check if the first LENGTH bit are the same
+ */
+extern bool sqsq_ip_prefix_match(struct in_addr ip1, struct in_addr ip2, int length);
+
 #endif /* _ZEBRA_OSPFD_H */
