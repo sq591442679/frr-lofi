@@ -1863,7 +1863,6 @@ void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 							// zlog_debug("dest?: %pFX", &(rn->p));
 							// zlog_debug("dest prefix4: %pI4", &((rn->p.u).prefix4));
 							// zlog_debug("origin next hop: %pI4", &(path->nexthop));
-							struct in_addr origin_nexthop = path->nexthop;
 							struct in_addr neighbor_intf_ip = sqsq_get_neighbor_intf_ip(current_addr);
 							path->nexthop = neighbor_intf_ip;
 							// zlog_debug("new next hop: %pI4", &(path->nexthop));
@@ -1884,6 +1883,61 @@ void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 						}	
 					}
 				}	
+			}
+			else {
+				struct route_table *tmp_table = route_table_init();
+				
+				// calculate tmp_table
+				ospf_spf_calculate(area, neighbor_lsa, tmp_table, all_rtrs, new_rtrs, false, true);
+
+				// modify tmp_table
+				for (struct route_node *rn = route_top(tmp_table); rn; rn = route_next(rn)) {
+					struct ospf_route *or = rn->info;
+					struct listnode *node, *nnode;
+					struct ospf_path *path;
+					struct ospf_interface *oi;
+					if (or != NULL) { // NOTE this judgement is important
+						int cnt = 0;
+						for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) {
+							cnt++;
+							struct in_addr current_addr = { (l->link_data.s_addr) };
+							struct in_addr neighbor_intf_ip = sqsq_get_neighbor_intf_ip(current_addr);
+							path->nexthop = neighbor_intf_ip;
+							if (oi = ospf_if_lookup_by_local_addr(ospf, NULL, l->link_data)) {
+								path->ifindex = oi->ifp->ifindex;
+								if (!sqsq_ip_prefix_match(rn->p.u.prefix4, current_addr, rn->p.prefixlen)) {
+									or->cost += ntohs(l->m[0].metric);
+								}
+							}
+							else {
+								list_delete_node(or->paths, node);
+							}
+						}	
+					}
+				}
+
+				// find the corresponding route node in new_table and add path
+				for (struct route_node *node_in_tmp = route_top(tmp_table); node_in_tmp; node_in_tmp = route_next(node_in_tmp)) {
+					struct ospf_route *route_in_tmp = node_in_tmp->info;
+					if (route_in_tmp != NULL) {
+						for (struct route_node *node_in_new = route_top(new_table); node_in_new; node_in_new = route_next(node_in_new)) {
+							struct ospf_route *route_in_new = node_in_new->info;
+							if (route_in_new != NULL) {
+								if (prefix_same(&(node_in_new->p), &(node_in_tmp->p))) {
+									struct listnode *node, *nnode;
+									struct ospf_path *path;
+									for (ALL_LIST_ELEMENTS(route_in_tmp->paths, node, nnode, path)) {
+										listnode_add(route_in_new->paths, path);
+									}
+								}
+							}
+						}	
+					}
+					
+				}
+
+				// do I need to free here?
+				// ospf_route_table_free(tmp_table);
 			}
 		}
 	}
