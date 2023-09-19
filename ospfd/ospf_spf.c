@@ -844,18 +844,25 @@ static unsigned int ospf_nexthop_calculation(struct ospf_area *area,
 				struct ospf_interface *oi = NULL;
 				struct in_addr nexthop = {.s_addr = 0};
 
+				/** @sqsq */
 				if (area->spf_root_node) {
-					oi = ospf_if_lookup_by_lsa_pos(area,
-								       lsa_pos);
-					if (!oi) {
-						zlog_debug(
-							"%s: OI not found in LSA: lsa_pos: %d link_id:%pI4 link_data:%pI4",
-							__func__, lsa_pos,
-							&l->link_id,
-							&l->link_data);
-						return 0;
-					}
+					nexthop = sqsq_get_neighbor_intf_ip(l->link_data);
+					added = 1;
 				}
+
+				/** sqsq */
+				// if (area->spf_root_node) {
+				// 	oi = ospf_if_lookup_by_lsa_pos(area,
+				// 				       lsa_pos);
+				// 	if (!oi) {
+				// 		zlog_debug(
+				// 			"%s: OI not found in LSA: lsa_pos: %d link_id:%pI4 link_data:%pI4",
+				// 			__func__, lsa_pos,
+				// 			&l->link_id,
+				// 			&l->link_data);
+				// 		return 0;
+				// 	}
+				// }
 
 				/*
 				 * If the destination is a router which connects
@@ -915,63 +922,64 @@ static unsigned int ospf_nexthop_calculation(struct ospf_area *area,
 				 * the interface code needs to be removed
 				 * somehow.
 				 */
-				if (area->ospf->ti_lfa_enabled
-				    || (oi && oi->type == OSPF_IFTYPE_POINTOPOINT)
-				    || (oi && oi->type == OSPF_IFTYPE_POINTOMULTIPOINT
-					   && oi->address->prefixlen == IPV4_MAX_BITLEN)) {
-					struct ospf_neighbor *nbr_w = NULL;
+				/** @sqsq */
+				// if (area->ospf->ti_lfa_enabled
+				//     || (oi && oi->type == OSPF_IFTYPE_POINTOPOINT)
+				//     || (oi && oi->type == OSPF_IFTYPE_POINTOMULTIPOINT
+				// 	   && oi->address->prefixlen == IPV4_MAX_BITLEN)) {
+				// 	struct ospf_neighbor *nbr_w = NULL;
 
-					/* Calculating node is root node, link
-					 * is P2P */
-					if (area->spf_root_node) {
-						nbr_w = ospf_nbr_lookup_by_routerid(
-							oi->nbrs, &l->link_id);
-						if (nbr_w) {
-							added = 1;
-							nexthop = nbr_w->src;
-						}
-					}
+				// 	/* Calculating node is root node, link
+				// 	 * is P2P */
+				// 	if (area->spf_root_node) {
+				// 		nbr_w = ospf_nbr_lookup_by_routerid(
+				// 			oi->nbrs, &l->link_id);
+				// 		if (nbr_w) {
+				// 			added = 1;
+				// 			nexthop = nbr_w->src;
+				// 		}
+				// 	}
 
-					/* Reverse lookup */
-					if (!added) {
-						while ((l2 = ospf_get_next_link(
-								w, v, l2))) {
-							if (match_stub_prefix(
-								    v->lsa,
-								    l->link_data,
-								    l2->link_data)) {
-								added = 1;
-								nexthop =
-									l2->link_data;
-								break;
-							}
-						}
-					}
-				} else if (oi && oi->type
-					   == OSPF_IFTYPE_POINTOMULTIPOINT) {
-					struct prefix_ipv4 la;
+				// 	/* Reverse lookup */
+				// 	if (!added) {
+				// 		while ((l2 = ospf_get_next_link(
+				// 				w, v, l2))) {
+				// 			if (match_stub_prefix(
+				// 				    v->lsa,
+				// 				    l->link_data,
+				// 				    l2->link_data)) {
+				// 				added = 1;
+				// 				nexthop =
+				// 					l2->link_data;
+				// 				break;
+				// 			}
+				// 		}
+				// 	}
+				// } else if (oi && oi->type
+				// 	   == OSPF_IFTYPE_POINTOMULTIPOINT) {
+				// 	struct prefix_ipv4 la;
 
-					la.family = AF_INET;
-					la.prefixlen = oi->address->prefixlen;
+				// 	la.family = AF_INET;
+				// 	la.prefixlen = oi->address->prefixlen;
 
-					/*
-					 * V links to W on PtMP interface;
-					 * find the interface address on W
-					 */
-					while ((l2 = ospf_get_next_link(w, v,
-									l2))) {
-						la.prefix = l2->link_data;
+				// 	/*
+				// 	 * V links to W on PtMP interface;
+				// 	 * find the interface address on W
+				// 	 */
+				// 	while ((l2 = ospf_get_next_link(w, v,
+				// 					l2))) {
+				// 		la.prefix = l2->link_data;
 
-						if (prefix_cmp((struct prefix
-									*)&la,
-							       oi->address)
-						    != 0)
-							continue;
-						added = 1;
-						nexthop = l2->link_data;
-						break;
-					}
-				}
+				// 		if (prefix_cmp((struct prefix
+				// 					*)&la,
+				// 			       oi->address)
+				// 		    != 0)
+				// 			continue;
+				// 		added = 1;
+				// 		nexthop = l2->link_data;
+				// 		break;
+				// 	}
+				// }
 
 				if (added) {
 					nh = vertex_nexthop_new();
