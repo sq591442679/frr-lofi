@@ -55,6 +55,11 @@ struct ospf_path {
 	ifindex_t ifindex;
 	unsigned char unnumbered;
 	struct sr_nexthop_info srni;
+
+	/**
+	 * @sqsq
+	 */
+	uint32_t cost;
 };
 
 /* Below is the structure linked to every

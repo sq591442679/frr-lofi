@@ -1814,6 +1814,41 @@ void ospf_spf_calculate(struct ospf_area *area, struct ospf_lsa *root_lsa,
 			   mtype_stats_alloc(MTYPE_OSPF_VERTEX));
 }
 
+/**
+ * @sqsq
+ */
+int sqsq_path_cmp(const void **first, const void **second)
+{
+	struct ospf_path *path_first = (struct ospf_path *)(*first), *path_second = (struct ospf_path *)(*second);
+	if (path_first->cost < path_second->cost) {
+		return -1;
+	}
+	else if (path_first->cost > path_second->cost) {
+		return 1;
+	}
+	else {
+		return 0;
+	}
+}
+
+/**
+ * @sqsq
+ * return the count of elements equals to path
+ */
+int sqsq_find_in_path_list(struct list* list, struct ospf_path *path)
+{
+	struct listnode *node, *nnode;
+	struct ospf_path *path_in_list;
+	int ret = 0;
+	for (ALL_LIST_ELEMENTS(list, node, nnode, path_in_list)) {
+		// zlog_debug("next hop in list: %pI4, next hop to add: %pI4", &(path_in_list->nexthop), &(path->nexthop));
+		if (path_in_list->nexthop.s_addr == path->nexthop.s_addr) {
+			ret++;
+		}
+	}
+	return ret;
+}
+
 void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 			     struct route_table *new_table,
 			     struct route_table *all_rtrs,
@@ -1825,13 +1860,10 @@ void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 	struct lsa_header *current_lsa = area->router_lsa_self->data;
 	uint8_t *p = (uint8_t *)current_lsa + OSPF_LSA_HEADER_SIZE + 4; // point to the beginning of the first link
 	uint8_t *lim = (uint8_t *)current_lsa + ntohs(current_lsa->length);
-	int lsa_pos = -1, lsa_pos_next = 0, cnt = 0;
+	int cnt = 0;
 
 	while (p < lim) {
 		struct router_lsa_link *l = (struct router_lsa_link *)p;
-		
-		lsa_pos = lsa_pos_next;
-		lsa_pos_next++;
 
 		p += (OSPF_ROUTER_LSA_LINK_SIZE + l->m[0].tos_count * OSPF_ROUTER_LSA_TOS_SIZE);
 
@@ -1855,32 +1887,29 @@ void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 					struct ospf_path *path;
 					struct ospf_interface *oi;
 					if (or != NULL) { // NOTE this judgement is important
-						// zlog_debug("next hop cost: %d", or->cost);
-						int cnt = 0;
 						for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) {
-							cnt++;
 							struct in_addr current_addr = { (l->link_data.s_addr) };
-							// zlog_debug("dest?: %pFX", &(rn->p));
-							// zlog_debug("dest prefix4: %pI4", &((rn->p.u).prefix4));
-							// zlog_debug("origin next hop: %pI4", &(path->nexthop));
 							struct in_addr neighbor_intf_ip = sqsq_get_neighbor_intf_ip(current_addr);
 							path->nexthop = neighbor_intf_ip;
-							// zlog_debug("new next hop: %pI4", &(path->nexthop));
-							// zlog_debug("origin ifindex: %d", path->ifindex);
-							if (oi = ospf_if_lookup_by_local_addr(ospf, NULL, l->link_data)) {
+							oi = ospf_if_lookup_by_local_addr(ospf, NULL, l->link_data);
+							if (oi) {
 								path->ifindex = oi->ifp->ifindex;
 								if (!sqsq_ip_prefix_match(rn->p.u.prefix4, current_addr, rn->p.prefixlen)) {
-									// zlog_debug("link cost: %d", ntohs(l->m[0].metric));
 									or->cost += ntohs(l->m[0].metric);
 								}
-								// zlog_debug("new ifindex: %d", path->ifindex);
+								path->cost = or->cost;
 							}
 							else {
-								// zlog_debug("no/ such ospf_interface");
 								list_delete_node(or->paths, node);
 							}
-							// zlog_debug("cnt:%d", cnt);
-						}	
+						}
+
+						// delete duplicate next hops (due to original equal-cost paths)
+						for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) { 
+							if (sqsq_find_in_path_list(or->paths, path) > 1) {
+								list_delete_node(or->paths, node);
+							}
+						}
 					}
 				}	
 			}
@@ -1897,17 +1926,17 @@ void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 					struct ospf_path *path;
 					struct ospf_interface *oi;
 					if (or != NULL) { // NOTE this judgement is important
-						int cnt = 0;
 						for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) {
-							cnt++;
 							struct in_addr current_addr = { (l->link_data.s_addr) };
 							struct in_addr neighbor_intf_ip = sqsq_get_neighbor_intf_ip(current_addr);
 							path->nexthop = neighbor_intf_ip;
-							if (oi = ospf_if_lookup_by_local_addr(ospf, NULL, l->link_data)) {
+							oi = ospf_if_lookup_by_local_addr(ospf, NULL, l->link_data);
+							if (oi) {
 								path->ifindex = oi->ifp->ifindex;
 								if (!sqsq_ip_prefix_match(rn->p.u.prefix4, current_addr, rn->p.prefixlen)) {
 									or->cost += ntohs(l->m[0].metric);
 								}
+								path->cost = or->cost;
 							}
 							else {
 								list_delete_node(or->paths, node);
@@ -1927,13 +1956,14 @@ void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 									struct listnode *node, *nnode;
 									struct ospf_path *path;
 									for (ALL_LIST_ELEMENTS(route_in_tmp->paths, node, nnode, path)) {
-										listnode_add(route_in_new->paths, path);
+										if (sqsq_find_in_path_list(route_in_new->paths, path) == 0) {
+											listnode_add(route_in_new->paths, path);
+										}
 									}
 								}
 							}
 						}	
 					}
-					
 				}
 
 				// do I need to free here?
@@ -1941,6 +1971,21 @@ void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 			}
 		}
 	}
+
+	/**
+	 * @sqsq
+	 * sort paths in routing table
+	 */
+	for (struct route_node *rn = route_top(new_table); rn; rn = route_next(rn)) {
+		struct ospf_route *or = rn->info;
+		if (or != NULL) { // NOTE this judgement is important
+			// zlog_debug("length: %d", or->paths->count);
+			if (or->paths->count > 4) {
+				zlog_debug("routing table has duplicate next hops!!");
+			}
+			list_sort(or->paths, sqsq_path_cmp);
+		}
+	}	
 
 	// ospf_spf_calculate(area, area->router_lsa_self, new_table, all_rtrs,
 	// 		   new_rtrs, false, true);

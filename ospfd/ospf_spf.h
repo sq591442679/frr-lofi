@@ -24,6 +24,10 @@
 
 #include "typesafe.h"
 
+/**@sqsq */
+#include "ospfd/ospf_route.h"
+
+
 /* values for vertex->type */
 #define OSPF_VERTEX_ROUTER  1  /* for a Router-LSA */
 #define OSPF_VERTEX_NETWORK 2  /* for a Network-LSA */
@@ -104,4 +108,9 @@ extern int vertex_parent_cmp(void *aa, void *bb);
 extern void ospf_spf_print(struct vty *vty, struct vertex *v, int i);
 extern void ospf_restart_spf(struct ospf *ospf);
 /* void ospf_spf_calculate_timer_add (); */
+
+/**@sqsq */
+extern int sqsq_path_cmp(const void **first, const void **second);
+extern int sqsq_find_in_path_list(struct list *list, struct ospf_path *path);
+
 #endif /* _QUAGGA_OSPF_SPF_H */
