@@ -1824,6 +1824,10 @@ void ospf_spf_calculate(struct ospf_area *area, struct ospf_lsa *root_lsa,
 
 /**
  * @sqsq
+ * the path with smaller cost positions closer to the top
+ * smaller cost means smaller weight
+ * routes with lower weight value have higher priority
+ * thus corresponds "ip ospf route" to "ip route"
  */
 int sqsq_path_cmp(const void **first, const void **second)
 {
@@ -1989,9 +1993,16 @@ void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 		if (or != NULL) { // NOTE this judgement is important
 			// zlog_debug("length: %d", or->paths->count);
 			if (or->paths->count > 4) {
-				zlog_debug("routing table has duplicate next hops!!");
+				zlog_warn("routing table has duplicate next hops!!");
 			}
 			list_sort(or->paths, sqsq_path_cmp);
+			int cnt = 0;
+			struct listnode *node, *nnode;
+			struct ospf_path *path;
+			for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) {
+				cnt++;
+				path->weight = cnt;
+			}
 		}
 	}	
 

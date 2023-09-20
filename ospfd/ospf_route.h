@@ -60,6 +60,7 @@ struct ospf_path {
 	 * @sqsq
 	 */
 	uint32_t cost;
+	uint8_t weight;
 };
 
 /* Below is the structure linked to every

@@ -10687,13 +10687,13 @@ static void show_ip_ospf_route_network(struct vty *vty, struct ospf *ospf,
 									ospf->vrf_id));
 						} else {
 							vty_out(vty,
-								"%24s   via %pI4, %s, cost: %u\n",  /** sqsq */
+								"%24s   via %pI4, %s, cost: %u, weight: %u\n",  /** sqsq */
 								"",
 								&path->nexthop,
 								ifindex2ifname(
 									path->ifindex,
 									ospf->vrf_id),
-								path->cost);
+								path->cost, path->weight);
 						}
 					}
 				}
