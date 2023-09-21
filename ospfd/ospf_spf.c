@@ -1996,12 +1996,12 @@ void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 				zlog_warn("routing table has duplicate next hops!!");
 			}
 			list_sort(or->paths, sqsq_path_cmp);
-			int cnt = 0;
+			int weight = 0;
 			struct listnode *node, *nnode;
 			struct ospf_path *path;
 			for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) {
-				cnt++;
-				path->weight = cnt;
+				weight++;
+				path->weight = weight;
 			}
 		}
 	}	

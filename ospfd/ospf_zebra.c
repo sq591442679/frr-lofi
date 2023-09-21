@@ -362,6 +362,14 @@ void ospf_zebra_add(struct ospf *ospf, struct prefix_ipv4 *p,
 		}
 	}
 
+	/**
+	 * @sqsq
+	 */
+	// for (uint16_t i = 0; i < api.nexthop_num; ++i) {
+	// 	zlog_debug("added dst:%pFX, no.%d next hop %s", &api.prefix, i, 
+	// 		/*&api.nexthops[i].gate.ipv4*/ifindex2ifname(api.nexthops[i].ifindex, api.vrf_id));
+	// }
+
 	if (CHECK_FLAG(ospf->config, OSPF_SEND_EXTRA_DATA_TO_ZEBRA))
 		ospf_zebra_append_opaque_attr(or, &api);
 

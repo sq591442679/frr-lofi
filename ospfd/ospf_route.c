@@ -245,6 +245,14 @@ int ospf_route_match_same(struct route_table *rt, struct prefix_ipv4 *prefix,
 				if (op->ifindex != newop->ifindex)
 					return 0;
 
+				/** @sqsq */
+				if (op->cost != newop->cost) {
+					return 0;
+				}
+				if (op->weight != newop->weight) {
+					return 0;
+				}
+
 				/* check TI-LFA backup paths */
 				if (!ospf_route_backup_path_same(&op->srni,
 								 &newop->srni))

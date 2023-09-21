@@ -829,6 +829,15 @@ zclient_route_send(uint8_t cmd, struct zclient *zclient, struct zapi_route *api)
 {
 	if (zapi_route_encode(cmd, zclient->obuf, api) < 0)
 		return ZCLIENT_SEND_FAILURE;
+	
+	/** sqsq */
+	// struct zapi_route sqsq_api;
+	// zapi_route_decode(zclient->obuf, &sqsq_api);
+	// for (uint16_t i = 0; i < sqsq_api.nexthop_num; ++i) {
+	// 	zlog_debug("added dst:%pFX, no.%d next hop %s", &sqsq_api.prefix, i, 
+	// 		/*&api.nexthops[i].gate.ipv4*/ifindex2ifname(sqsq_api.nexthops[i].ifindex, sqsq_api.vrf_id));
+	// }
+
 	return zclient_send_message(zclient);
 }
 

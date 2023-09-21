@@ -687,6 +687,15 @@ void rib_install_kernel(struct route_node *rn, struct route_entry *re,
 	 */
 	zebra_nhg_install_kernel(re->nhe);
 
+	/** @sqsq */
+	// struct nexthop *nhop = re->nhe->nhg.nexthop;
+	// int cnt = 0;
+	// while (nhop) {
+	// 	zlog_debug("add %pFX next hop no.%d %s to kernel", &rn->p, cnt, ifindex2ifname(nhop->ifindex, nhop->vrf_id));
+	// 	nhop = nhop->next;
+	// 	cnt++;
+	// }
+
 	/*
 	 * If this is a replace to a new RE let the originator of the RE
 	 * know that they've lost

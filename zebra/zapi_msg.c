@@ -1857,6 +1857,16 @@ static bool zapi_read_nexthops(struct zserv *client, struct prefix *p,
 		}
 	}
 
+	/** @sqsq */
+	// struct nexthop *nhop;
+	// int cnt = 0;
+	// if (p && png && ng) {
+	// 	for (ALL_NEXTHOPS_PTR(ng, nhop)) {
+	// 		zlog_debug("added dst:%pFX, no.%d next hop %s", p, cnt, 
+	// 			/*&api.nexthops[i].gate.ipv4*/ifindex2ifname(nhop->ifindex, nhop->vrf_id));
+	// 		cnt++;
+	// 	}
+	// }
 
 	/* succesfully read, set caller pointers now */
 	if (png)
@@ -2049,6 +2059,12 @@ static void zread_route_add(ZAPI_HANDLER_ARGS)
 				   __func__);
 		return;
 	}
+
+	/** @sqsq */
+	// for (uint16_t i = 0; i < api.nexthop_num; ++i) {
+	// 	zlog_debug("added dst:%pFX, no.%d next hop %s", &api.prefix, i, 
+	// 		/*&api.nexthops[i].gate.ipv4*/ifindex2ifname(api.nexthops[i].ifindex, api.vrf_id));
+	// }
 
 	vrf_id = zvrf_id(zvrf);
 
