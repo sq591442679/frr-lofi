@@ -2168,6 +2168,14 @@ ssize_t netlink_route_multipath_msg_encode(int cmd,
 			zlog_debug("%s: %pFX nhg_id is %u", __func__, p,
 				   dplane_ctx_get_nhe_id(ctx));
 
+		/** sqsq */
+		// int cnt = 0;
+		// for (ALL_NEXTHOPS_PTR(dplane_ctx_get_ng(ctx), nexthop)) {
+		// 	if (nexthop) {
+		// 		zlog_debug("next hop %d: %pI4, %s", cnt, &nexthop->gate.ipv4, ifindex2ifname(nexthop->ifindex, nexthop->vrf_id));
+		// 	}
+		// }
+
 		if (!nl_attr_put32(&req->n, datalen, RTA_NH_ID,
 				   dplane_ctx_get_nhe_id(ctx)))
 			return 0;
