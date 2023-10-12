@@ -4136,6 +4136,11 @@ done:
  */
 enum zebra_dplane_result dplane_nexthop_add(struct nhg_hash_entry *nhe)
 {
+	/** @sqsq */
+	// if (nhe) {
+	// 	zlog_debug("%s  sqsq add nexthop is:%d", __func__, nhe->id);
+	// }
+
 	enum zebra_dplane_result ret = ZEBRA_DPLANE_REQUEST_FAILURE;
 
 	if (nhe)

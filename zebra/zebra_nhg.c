@@ -2998,10 +2998,17 @@ uint8_t zebra_nhg_nhe2grp(struct nh_grp *grp, struct nhg_hash_entry *nhe,
 
 void zebra_nhg_install_kernel(struct nhg_hash_entry *nhe)
 {
+	/** @sqsq */
+	// zlog_debug("%s   install nhe id before resolve:%d", __func__, nhe->id);
+	// zebra_nhg_set_valid(nhe);
+
 	struct nhg_connected *rb_node_dep = NULL;
 
 	/* Resolve it first */
 	nhe = zebra_nhg_resolve(nhe);
+
+	/** @sqsq */
+	// zlog_debug("%s   resloved nhe id:%d", __func__, nhe->id);
 
 	/* Make sure all depends are installed/queued */
 	frr_each(nhg_connected_tree, &nhe->nhg_depends, rb_node_dep) {
@@ -3009,11 +3016,15 @@ void zebra_nhg_install_kernel(struct nhg_hash_entry *nhe)
 	}
 
 	if (CHECK_FLAG(nhe->flags, NEXTHOP_GROUP_VALID)
-	    && !CHECK_FLAG(nhe->flags, NEXTHOP_GROUP_INSTALLED)
+		/** @sqsq */
+	    // && !CHECK_FLAG(nhe->flags, NEXTHOP_GROUP_INSTALLED)
 	    && !CHECK_FLAG(nhe->flags, NEXTHOP_GROUP_QUEUED)) {
 		/* Change its type to us since we are installing it */
 		if (!ZEBRA_NHG_CREATED(nhe))
 			nhe->type = ZEBRA_ROUTE_NHG;
+
+		/** @sqsq */
+		// zlog_debug("%s   installed nhe id:%d", __func__, nhe->id);
 
 		int ret = dplane_nexthop_add(nhe);
 

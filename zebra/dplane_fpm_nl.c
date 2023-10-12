@@ -1074,8 +1074,6 @@ static int fpm_nhg_send_cb(struct hash_bucket *bucket, void *arg)
 	struct fpm_nhg_arg *fna = arg;
 
 	/* This entry was already sent, skip it. */
-	if (CHECK_FLAG(nhe->flags, NEXTHOP_GROUP_FPM))
-		return HASHWALK_CONTINUE;
 
 	/* Reset ctx to reuse allocated memory, take a snapshot and send it. */
 	dplane_ctx_reset(fna->ctx);

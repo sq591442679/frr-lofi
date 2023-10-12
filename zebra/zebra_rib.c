@@ -681,6 +681,8 @@ void rib_install_kernel(struct route_node *rn, struct route_entry *re,
 		return;
 	}
 
+	/** @sqsq */
+	// zlog_debug("%s    nhe id:%d", __func__, re->nhe->id);
 
 	/*
 	 * Install the resolved nexthop object first.
@@ -690,8 +692,9 @@ void rib_install_kernel(struct route_node *rn, struct route_entry *re,
 	/** @sqsq */
 	// struct nexthop *nhop = re->nhe->nhg.nexthop;
 	// int cnt = 0;
+	// zlog_debug("%s    nhe id:%d", __func__, re->nhe->id);
 	// while (nhop) {
-	// 	zlog_debug("add %pFX next hop no.%d %s to kernel", &rn->p, cnt, ifindex2ifname(nhop->ifindex, nhop->vrf_id));
+	// 	zlog_debug("add %pFX next hop no.%d %s weight %d to kernel", &rn->p, cnt, ifindex2ifname(nhop->ifindex, nhop->vrf_id), nhop->weight);
 	// 	nhop = nhop->next;
 	// 	cnt++;
 	// }

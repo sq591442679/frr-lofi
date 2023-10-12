@@ -2866,6 +2866,15 @@ enum netlink_msg_status
 netlink_put_nexthop_update_msg(struct nl_batch *bth,
 			       struct zebra_dplane_ctx *ctx)
 {
+	/** @sqsq */
+	// int op = dplane_ctx_get_op(ctx);
+	// if (op == DPLANE_OP_NH_INSTALL) {
+	// 	zlog_debug("%s  sqsq install nexthop DPLANE_OP_NH_INSTALL", __func__);
+	// }
+	// else if (op == DPLANE_OP_NH_UPDATE) {
+	// 	zlog_debug("%s  sqsq install nexthop DPLANE_OP_NH_UPDATE", __func__);
+	// }
+
 	/* Nothing to do if the kernel doesn't support nexthop objects */
 	if (!kernel_nexthops_supported())
 		return FRR_NETLINK_SUCCESS;
