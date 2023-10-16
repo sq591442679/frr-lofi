@@ -845,141 +845,147 @@ static unsigned int ospf_nexthop_calculation(struct ospf_area *area,
 				struct in_addr nexthop = {.s_addr = 0};
 
 				/** @sqsq */
-				if (area->spf_root_node) {
-					nexthop = sqsq_get_neighbor_intf_ip(l->link_data);
-					added = 1;
+				if (SQSQ_NEW_TABLE_STRUCTURE) {
+					if (area->spf_root_node) {
+						nexthop = sqsq_get_neighbor_intf_ip(l->link_data);
+						added = 1;
+					}
+
+					/** sqsq */
+					// if (area->spf_root_node) {
+					// 	oi = ospf_if_lookup_by_lsa_pos(area,
+					// 				       lsa_pos);
+					// 	if (!oi) {
+					// 		zlog_debug(
+					// 			"%s: OI not found in LSA: lsa_pos: %d link_id:%pI4 link_data:%pI4",
+					// 			__func__, lsa_pos,
+					// 			&l->link_id,
+					// 			&l->link_data);
+					// 		return 0;
+					// 	}
+					// }	
 				}
+				else {
+					/** @sqsq
+					 * origin ospf
+					 */
+					/*
+					* If the destination is a router which connects
+					* to the calculating router via a
+					* Point-to-MultiPoint network, the
+					* destination's next hop IP address(es) can be
+					* determined by examining the destination's
+					* router-LSA: each link pointing back to the
+					* calculating router and having a Link Data
+					* field belonging to the Point-to-MultiPoint
+					* network provides an IP address of the next
+					* hop router.
+					*
+					* At this point l is a link from V to W, and V
+					* is the root ("us"). If it is a point-to-
+					* multipoint interface, then look through the
+					* links in the opposite direction (W to V).
+					* If any of them have an address that lands
+					* within the subnet declared by the PtMP link,
+					* then that link is a constituent of the PtMP
+					* link, and its address is a nexthop address
+					* for V.
+					*
+					* Note for point-to-point interfaces:
+					*
+					* Having nexthop = 0 (as proposed in the RFC)
+					* is tempting, but NOT acceptable. It breaks
+					* AS-External routes with a forwarding address,
+					* since ospf_ase_complete_direct_routes() will
+					* mistakenly assume we've reached the last hop
+					* and should place the forwarding address as
+					* nexthop. Also, users may configure multi-
+					* access links in p2p mode, so we need the IP
+					* to ARP the nexthop.
+					*
+					* If the calculating router is the SPF root
+					* node and the link is P2P then access the
+					* interface information directly. This can be
+					* crucial when e.g. IP unnumbered is used
+					* where 'correct' nexthop information are not
+					* available via Router LSAs.
+					*
+					* Otherwise handle P2P and P2MP the same way
+					* as described above using a reverse lookup to
+					* figure out the nexthop.
+					*/
 
-				/** sqsq */
-				// if (area->spf_root_node) {
-				// 	oi = ospf_if_lookup_by_lsa_pos(area,
-				// 				       lsa_pos);
-				// 	if (!oi) {
-				// 		zlog_debug(
-				// 			"%s: OI not found in LSA: lsa_pos: %d link_id:%pI4 link_data:%pI4",
-				// 			__func__, lsa_pos,
-				// 			&l->link_id,
-				// 			&l->link_data);
-				// 		return 0;
-				// 	}
-				// }
+					/*
+					* HACK: we don't know (yet) how to distinguish
+					* between P2P and P2MP interfaces by just
+					* looking at LSAs, which is important for
+					* TI-LFA since you want to do SPF calculations
+					* from the perspective of other nodes. Since
+					* TI-LFA is currently not implemented for P2MP
+					* we just check here if it is enabled and then
+					* blindly assume that P2P is used. Ultimately
+					* the interface code needs to be removed
+					* somehow.
+					*/
+					/** @sqsq */
+					if (area->ospf->ti_lfa_enabled
+					    || (oi && oi->type == OSPF_IFTYPE_POINTOPOINT)
+					    || (oi && oi->type == OSPF_IFTYPE_POINTOMULTIPOINT
+						   && oi->address->prefixlen == IPV4_MAX_BITLEN)) {
+						struct ospf_neighbor *nbr_w = NULL;
 
-				/*
-				 * If the destination is a router which connects
-				 * to the calculating router via a
-				 * Point-to-MultiPoint network, the
-				 * destination's next hop IP address(es) can be
-				 * determined by examining the destination's
-				 * router-LSA: each link pointing back to the
-				 * calculating router and having a Link Data
-				 * field belonging to the Point-to-MultiPoint
-				 * network provides an IP address of the next
-				 * hop router.
-				 *
-				 * At this point l is a link from V to W, and V
-				 * is the root ("us"). If it is a point-to-
-				 * multipoint interface, then look through the
-				 * links in the opposite direction (W to V).
-				 * If any of them have an address that lands
-				 * within the subnet declared by the PtMP link,
-				 * then that link is a constituent of the PtMP
-				 * link, and its address is a nexthop address
-				 * for V.
-				 *
-				 * Note for point-to-point interfaces:
-				 *
-				 * Having nexthop = 0 (as proposed in the RFC)
-				 * is tempting, but NOT acceptable. It breaks
-				 * AS-External routes with a forwarding address,
-				 * since ospf_ase_complete_direct_routes() will
-				 * mistakenly assume we've reached the last hop
-				 * and should place the forwarding address as
-				 * nexthop. Also, users may configure multi-
-				 * access links in p2p mode, so we need the IP
-				 * to ARP the nexthop.
-				 *
-				 * If the calculating router is the SPF root
-				 * node and the link is P2P then access the
-				 * interface information directly. This can be
-				 * crucial when e.g. IP unnumbered is used
-				 * where 'correct' nexthop information are not
-				 * available via Router LSAs.
-				 *
-				 * Otherwise handle P2P and P2MP the same way
-				 * as described above using a reverse lookup to
-				 * figure out the nexthop.
-				 */
+						/* Calculating node is root node, link
+						 * is P2P */
+						if (area->spf_root_node) {
+							nbr_w = ospf_nbr_lookup_by_routerid(
+								oi->nbrs, &l->link_id);
+							if (nbr_w) {
+								added = 1;
+								nexthop = nbr_w->src;
+							}
+						}
 
-				/*
-				 * HACK: we don't know (yet) how to distinguish
-				 * between P2P and P2MP interfaces by just
-				 * looking at LSAs, which is important for
-				 * TI-LFA since you want to do SPF calculations
-				 * from the perspective of other nodes. Since
-				 * TI-LFA is currently not implemented for P2MP
-				 * we just check here if it is enabled and then
-				 * blindly assume that P2P is used. Ultimately
-				 * the interface code needs to be removed
-				 * somehow.
-				 */
-				/** @sqsq */
-				// if (area->ospf->ti_lfa_enabled
-				//     || (oi && oi->type == OSPF_IFTYPE_POINTOPOINT)
-				//     || (oi && oi->type == OSPF_IFTYPE_POINTOMULTIPOINT
-				// 	   && oi->address->prefixlen == IPV4_MAX_BITLEN)) {
-				// 	struct ospf_neighbor *nbr_w = NULL;
+						/* Reverse lookup */
+						if (!added) {
+							while ((l2 = ospf_get_next_link(
+									w, v, l2))) {
+								if (match_stub_prefix(
+									    v->lsa,
+									    l->link_data,
+									    l2->link_data)) {
+									added = 1;
+									nexthop =
+										l2->link_data;
+									break;
+								}
+							}
+						}
+					} else if (oi && oi->type
+						   == OSPF_IFTYPE_POINTOMULTIPOINT) {
+						struct prefix_ipv4 la;
 
-				// 	/* Calculating node is root node, link
-				// 	 * is P2P */
-				// 	if (area->spf_root_node) {
-				// 		nbr_w = ospf_nbr_lookup_by_routerid(
-				// 			oi->nbrs, &l->link_id);
-				// 		if (nbr_w) {
-				// 			added = 1;
-				// 			nexthop = nbr_w->src;
-				// 		}
-				// 	}
+						la.family = AF_INET;
+						la.prefixlen = oi->address->prefixlen;
 
-				// 	/* Reverse lookup */
-				// 	if (!added) {
-				// 		while ((l2 = ospf_get_next_link(
-				// 				w, v, l2))) {
-				// 			if (match_stub_prefix(
-				// 				    v->lsa,
-				// 				    l->link_data,
-				// 				    l2->link_data)) {
-				// 				added = 1;
-				// 				nexthop =
-				// 					l2->link_data;
-				// 				break;
-				// 			}
-				// 		}
-				// 	}
-				// } else if (oi && oi->type
-				// 	   == OSPF_IFTYPE_POINTOMULTIPOINT) {
-				// 	struct prefix_ipv4 la;
+						/*
+						 * V links to W on PtMP interface;
+						 * find the interface address on W
+						 */
+						while ((l2 = ospf_get_next_link(w, v,
+										l2))) {
+							la.prefix = l2->link_data;
 
-				// 	la.family = AF_INET;
-				// 	la.prefixlen = oi->address->prefixlen;
-
-				// 	/*
-				// 	 * V links to W on PtMP interface;
-				// 	 * find the interface address on W
-				// 	 */
-				// 	while ((l2 = ospf_get_next_link(w, v,
-				// 					l2))) {
-				// 		la.prefix = l2->link_data;
-
-				// 		if (prefix_cmp((struct prefix
-				// 					*)&la,
-				// 			       oi->address)
-				// 		    != 0)
-				// 			continue;
-				// 		added = 1;
-				// 		nexthop = l2->link_data;
-				// 		break;
-				// 	}
-				// }
+							if (prefix_cmp((struct prefix
+										*)&la,
+								       oi->address)
+							    != 0)
+								continue;
+							added = 1;
+							nexthop = l2->link_data;
+							break;
+						}
+					}					
+				}
 
 				if (added) {
 					nh = vertex_nexthop_new();
@@ -1869,145 +1875,151 @@ void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 	/**
 	 * @sqsq
 	 */
-	struct lsa_header *current_lsa = area->router_lsa_self->data;
-	uint8_t *p = (uint8_t *)current_lsa + OSPF_LSA_HEADER_SIZE + 4; // point to the beginning of the first link
-	uint8_t *lim = (uint8_t *)current_lsa + ntohs(current_lsa->length);
-	int cnt = 0;
+	if (SQSQ_NEW_TABLE_STRUCTURE) {
+		struct lsa_header *current_lsa = area->router_lsa_self->data;
+		uint8_t *p = (uint8_t *)current_lsa + OSPF_LSA_HEADER_SIZE + 4; // point to the beginning of the first link
+		uint8_t *lim = (uint8_t *)current_lsa + ntohs(current_lsa->length);
+		int cnt = 0;
 
-	while (p < lim) {
-		struct router_lsa_link *l = (struct router_lsa_link *)p;
+		while (p < lim) {
+			struct router_lsa_link *l = (struct router_lsa_link *)p;
 
-		p += (OSPF_ROUTER_LSA_LINK_SIZE + l->m[0].tos_count * OSPF_ROUTER_LSA_TOS_SIZE);
+			p += (OSPF_ROUTER_LSA_LINK_SIZE + l->m[0].tos_count * OSPF_ROUTER_LSA_TOS_SIZE);
 
-		int link_type = l->m[0].type;
-		if (link_type == LSA_LINK_TYPE_POINTOPOINT) {
-			cnt++;
-			struct ospf_lsa * neighbor_lsa = ospf_lsa_lookup(ospf, area, OSPF_ROUTER_LSA, l->link_id, l->link_id);
-			/**
-			 * @sqsq
-			 * found the neighbor's router LSA
-			 * then calculate SPF tree based on it
-			 */
-			if (cnt == 1) {
-				ospf_spf_calculate(area, neighbor_lsa, new_table, all_rtrs, new_rtrs, false, true);
+			int link_type = l->m[0].type;
+			if (link_type == LSA_LINK_TYPE_POINTOPOINT) {
+				cnt++;
+				struct ospf_lsa * neighbor_lsa = ospf_lsa_lookup(ospf, area, OSPF_ROUTER_LSA, l->link_id, l->link_id);
+				/**
+				 * @sqsq
+				 * found the neighbor's router LSA
+				 * then calculate SPF tree based on it
+				 */
+				if (cnt == 1) {
+					ospf_spf_calculate(area, neighbor_lsa, new_table, all_rtrs, new_rtrs, false, true);
 
-				// zlog_debug("calculating routing table based on upper neighbor");
+					// zlog_debug("calculating routing table based on upper neighbor");
 
-				for (struct route_node *rn = route_top(new_table); rn; rn = route_next(rn)) {
-					struct ospf_route *or = rn->info;
-					struct listnode *node, *nnode;
-					struct ospf_path *path;
-					struct ospf_interface *oi;
-					if (or != NULL) { // NOTE this judgement is important
-						for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) {
-							struct in_addr current_addr = { (l->link_data.s_addr) };
-							struct in_addr neighbor_intf_ip = sqsq_get_neighbor_intf_ip(current_addr);
-							path->nexthop = neighbor_intf_ip;
-							oi = ospf_if_lookup_by_local_addr(ospf, NULL, l->link_data);
-							if (oi) {
-								path->ifindex = oi->ifp->ifindex;
-								if (!sqsq_ip_prefix_match(rn->p.u.prefix4, current_addr, rn->p.prefixlen)) {
-									or->cost += ntohs(l->m[0].metric);
+					for (struct route_node *rn = route_top(new_table); rn; rn = route_next(rn)) {
+						struct ospf_route *or = rn->info;
+						struct listnode *node, *nnode;
+						struct ospf_path *path;
+						struct ospf_interface *oi;
+						if (or != NULL) { // NOTE this judgement is important
+							for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) {
+								struct in_addr current_addr = { (l->link_data.s_addr) };
+								struct in_addr neighbor_intf_ip = sqsq_get_neighbor_intf_ip(current_addr);
+								path->nexthop = neighbor_intf_ip;
+								oi = ospf_if_lookup_by_local_addr(ospf, NULL, l->link_data);
+								if (oi) {
+									path->ifindex = oi->ifp->ifindex;
+									if (!sqsq_ip_prefix_match(rn->p.u.prefix4, current_addr, rn->p.prefixlen)) {
+										or->cost += ntohs(l->m[0].metric);
+									}
+									path->cost = or->cost;
 								}
-								path->cost = or->cost;
+								else {
+									list_delete_node(or->paths, node);
+								}
 							}
-							else {
-								list_delete_node(or->paths, node);
+
+							// delete duplicate next hops (due to original equal-cost paths)
+							for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) { 
+								if (sqsq_find_in_path_list(or->paths, path) > 1) {
+									list_delete_node(or->paths, node);
+								}
 							}
 						}
-
-						// delete duplicate next hops (due to original equal-cost paths)
-						for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) { 
-							if (sqsq_find_in_path_list(or->paths, path) > 1) {
-								list_delete_node(or->paths, node);
-							}
-						}
-					}
-				}	
-			}
-			else {
-				struct route_table *tmp_table = route_table_init();
-				
-				// calculate tmp_table
-				ospf_spf_calculate(area, neighbor_lsa, tmp_table, all_rtrs, new_rtrs, false, true);
-
-				// modify tmp_table
-				for (struct route_node *rn = route_top(tmp_table); rn; rn = route_next(rn)) {
-					struct ospf_route *or = rn->info;
-					struct listnode *node, *nnode;
-					struct ospf_path *path;
-					struct ospf_interface *oi;
-					if (or != NULL) { // NOTE this judgement is important
-						for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) {
-							struct in_addr current_addr = { (l->link_data.s_addr) };
-							struct in_addr neighbor_intf_ip = sqsq_get_neighbor_intf_ip(current_addr);
-							path->nexthop = neighbor_intf_ip;
-							oi = ospf_if_lookup_by_local_addr(ospf, NULL, l->link_data);
-							if (oi) {
-								path->ifindex = oi->ifp->ifindex;
-								if (!sqsq_ip_prefix_match(rn->p.u.prefix4, current_addr, rn->p.prefixlen)) {
-									or->cost += ntohs(l->m[0].metric);
-								}
-								path->cost = or->cost;
-							}
-							else {
-								list_delete_node(or->paths, node);
-							}
-						}	
-					}
+					}	
 				}
+				else {
+					struct route_table *tmp_table = route_table_init();
+					
+					// calculate tmp_table
+					ospf_spf_calculate(area, neighbor_lsa, tmp_table, all_rtrs, new_rtrs, false, true);
 
-				// find the corresponding route node in new_table and add path
-				for (struct route_node *node_in_tmp = route_top(tmp_table); node_in_tmp; node_in_tmp = route_next(node_in_tmp)) {
-					struct ospf_route *route_in_tmp = node_in_tmp->info;
-					if (route_in_tmp != NULL) {
-						for (struct route_node *node_in_new = route_top(new_table); node_in_new; node_in_new = route_next(node_in_new)) {
-							struct ospf_route *route_in_new = node_in_new->info;
-							if (route_in_new != NULL) {
-								if (prefix_same(&(node_in_new->p), &(node_in_tmp->p))) {
-									struct listnode *node, *nnode;
-									struct ospf_path *path;
-									for (ALL_LIST_ELEMENTS(route_in_tmp->paths, node, nnode, path)) {
-										if (sqsq_find_in_path_list(route_in_new->paths, path) == 0) {
-											listnode_add(route_in_new->paths, path);
+					// modify tmp_table
+					for (struct route_node *rn = route_top(tmp_table); rn; rn = route_next(rn)) {
+						struct ospf_route *or = rn->info;
+						struct listnode *node, *nnode;
+						struct ospf_path *path;
+						struct ospf_interface *oi;
+						if (or != NULL) { // NOTE this judgement is important
+							for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) {
+								struct in_addr current_addr = { (l->link_data.s_addr) };
+								struct in_addr neighbor_intf_ip = sqsq_get_neighbor_intf_ip(current_addr);
+								path->nexthop = neighbor_intf_ip;
+								oi = ospf_if_lookup_by_local_addr(ospf, NULL, l->link_data);
+								if (oi) {
+									path->ifindex = oi->ifp->ifindex;
+									if (!sqsq_ip_prefix_match(rn->p.u.prefix4, current_addr, rn->p.prefixlen)) {
+										or->cost += ntohs(l->m[0].metric);
+									}
+									path->cost = or->cost;
+								}
+								else {
+									list_delete_node(or->paths, node);
+								}
+							}	
+						}
+					}
+
+					// find the corresponding route node in new_table and add path
+					for (struct route_node *node_in_tmp = route_top(tmp_table); node_in_tmp; node_in_tmp = route_next(node_in_tmp)) {
+						struct ospf_route *route_in_tmp = node_in_tmp->info;
+						if (route_in_tmp != NULL) {
+							for (struct route_node *node_in_new = route_top(new_table); node_in_new; node_in_new = route_next(node_in_new)) {
+								struct ospf_route *route_in_new = node_in_new->info;
+								if (route_in_new != NULL) {
+									if (prefix_same(&(node_in_new->p), &(node_in_tmp->p))) {
+										struct listnode *node, *nnode;
+										struct ospf_path *path;
+										for (ALL_LIST_ELEMENTS(route_in_tmp->paths, node, nnode, path)) {
+											if (sqsq_find_in_path_list(route_in_new->paths, path) == 0) {
+												listnode_add(route_in_new->paths, path);
+											}
 										}
 									}
 								}
-							}
-						}	
+							}	
+						}
 					}
+
+					// do I need to free here?
+					// ospf_route_table_free(tmp_table);
 				}
-
-				// do I need to free here?
-				// ospf_route_table_free(tmp_table);
 			}
 		}
+
+		/**
+		 * @sqsq
+		 * sort paths in routing table
+		 */
+		for (struct route_node *rn = route_top(new_table); rn; rn = route_next(rn)) {
+			struct ospf_route *or = rn->info;
+			if (or != NULL) { // NOTE this judgement is important
+				// zlog_debug("length: %d", or->paths->count);
+				if (or->paths->count > 4) {
+					zlog_warn("routing table has duplicate next hops!!");
+				}
+				list_sort(or->paths, sqsq_path_cmp);
+				int weight = 0;
+				struct listnode *node, *nnode;
+				struct ospf_path *path;
+				for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) {
+					weight++;
+					path->weight = weight;
+				}
+			}
+		}			
 	}
-
-	/**
-	 * @sqsq
-	 * sort paths in routing table
-	 */
-	for (struct route_node *rn = route_top(new_table); rn; rn = route_next(rn)) {
-		struct ospf_route *or = rn->info;
-		if (or != NULL) { // NOTE this judgement is important
-			// zlog_debug("length: %d", or->paths->count);
-			if (or->paths->count > 4) {
-				zlog_warn("routing table has duplicate next hops!!");
-			}
-			list_sort(or->paths, sqsq_path_cmp);
-			int weight = 0;
-			struct listnode *node, *nnode;
-			struct ospf_path *path;
-			for (ALL_LIST_ELEMENTS(or->paths, node, nnode, path)) {
-				weight++;
-				path->weight = weight;
-			}
-		}
-	}	
-
-	// ospf_spf_calculate(area, area->router_lsa_self, new_table, all_rtrs,
-	// 		   new_rtrs, false, true);
+	else {
+		/** @sqsq */
+		// origin ospf
+		ospf_spf_calculate(area, area->router_lsa_self, new_table, all_rtrs,
+				new_rtrs, false, true);	
+	}
+	
 
 	if (ospf->ti_lfa_enabled)
 		ospf_ti_lfa_compute(area, new_table,

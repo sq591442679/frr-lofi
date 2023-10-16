@@ -51,6 +51,7 @@
  * sqsq
  */
 #define OSPF_SQSQ_TTL			2U
+#define SQSQ_NEW_TABLE_STRUCTURE	false
 
 /* @sqsq */
 #define WARMUP_PERIOD			20

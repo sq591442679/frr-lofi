@@ -691,34 +691,39 @@ void ospf_intra_add_stub(struct route_table *rt, struct router_lsa_link *link,
 		}
 			
 		/** @sqsq */
-		path = ospf_path_new();
-		path->nexthop.s_addr = INADDR_ANY;
-		path->ifindex = 123;
-		listnode_add(or->paths, path);
-		
+		if (SQSQ_NEW_TABLE_STRUCTURE) {
+			path = ospf_path_new();
+			path->nexthop.s_addr = INADDR_ANY;
+			path->ifindex = 123;
+			listnode_add(or->paths, path);	
+		}
+		else {
+			/** @sqsq
+			 * origin ospf
+			 */
+			if (oi || area->spf_dry_run) {
+				if (IS_DEBUG_OSPF_EVENT)
+					zlog_debug("%s: the lsa pos is %d", __func__,
+						   lsa_pos);
 
-		// if (oi || area->spf_dry_run) {
-		// 	if (IS_DEBUG_OSPF_EVENT)
-		// 		zlog_debug("%s: the lsa pos is %d", __func__,
-		// 			   lsa_pos);
+				path = ospf_path_new();
+				path->nexthop.s_addr = INADDR_ANY;
 
-		// 	path = ospf_path_new();
-		// 	path->nexthop.s_addr = INADDR_ANY;
+				if (oi) {
+					path->ifindex = oi->ifp->ifindex;
+					if (CHECK_FLAG(oi->connected->flags,
+						       ZEBRA_IFA_UNNUMBERED))
+						path->unnumbered = 1;
+				}
 
-		// 	if (oi) {
-		// 		path->ifindex = oi->ifp->ifindex;
-		// 		if (CHECK_FLAG(oi->connected->flags,
-		// 			       ZEBRA_IFA_UNNUMBERED))
-		// 			path->unnumbered = 1;
-		// 	}
-
-		// 	listnode_add(or->paths, path);
-		// } 
-		// else {
-		// 	if (IS_DEBUG_OSPF_EVENT)
-		// 		zlog_debug("%s: where's the interface ?",
-		// 			   __func__);
-		// }
+				listnode_add(or->paths, path);
+			} 
+			else {
+				if (IS_DEBUG_OSPF_EVENT)
+					zlog_debug("%s: where's the interface ?",
+						   __func__);
+			}	
+		}
 	}
 
 	rn->info = or ;
@@ -880,30 +885,36 @@ void ospf_route_copy_nexthops_from_vertex(struct ospf_area *area,
 		 */
 
 		/** @sqsq */
-		path = ospf_path_new();
-		path->nexthop = nexthop->router;
-		path->adv_router = v->id;
-		path->ifindex = 12345;
-		listnode_add(to->paths, path);
+		if (SQSQ_NEW_TABLE_STRUCTURE) {
+			path = ospf_path_new();
+			path->nexthop = nexthop->router;
+			path->adv_router = v->id;
+			path->ifindex = 12345;
+			listnode_add(to->paths, path);	
+		}
+		else {
+			// origin ospf
+			if (!area->spf_dry_run)
+				oi = ospf_if_lookup_by_lsa_pos(area, nexthop->lsa_pos);
 
-		// if (!area->spf_dry_run)
-		// 	oi = ospf_if_lookup_by_lsa_pos(area, nexthop->lsa_pos);
+			if ((oi && !ospf_path_exist(to->paths, nexthop->router, oi))
+			    || area->spf_dry_run) {
+				path = ospf_path_new();
+				path->nexthop = nexthop->router;
+				path->adv_router = v->id;
 
-		// if ((oi && !ospf_path_exist(to->paths, nexthop->router, oi))
-		//     || area->spf_dry_run) {
-		// 	path = ospf_path_new();
-		// 	path->nexthop = nexthop->router;
-		// 	path->adv_router = v->id;
+				if (oi) {
+					path->ifindex = oi->ifp->ifindex;
+					if (CHECK_FLAG(oi->connected->flags,
+						       ZEBRA_IFA_UNNUMBERED))
+						path->unnumbered = 1;
+				}
 
-		// 	if (oi) {
-		// 		path->ifindex = oi->ifp->ifindex;
-		// 		if (CHECK_FLAG(oi->connected->flags,
-		// 			       ZEBRA_IFA_UNNUMBERED))
-		// 			path->unnumbered = 1;
-		// 	}
+				listnode_add(to->paths, path);
+			}	
+		}
 
-		// 	listnode_add(to->paths, path);
-		// }
+		
 	}
 }
 
