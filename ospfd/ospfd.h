@@ -51,9 +51,10 @@
  * sqsq
  */
 #define OSPF_SQSQ_TTL			2U
+#define IS_OSPF					true
 
 /* @sqsq */
-#define WARMUP_PERIOD			20
+#define WARMUP_PERIOD			3
 
 /* Default configuration file name for ospfd. */
 #define OSPF_DEFAULT_CONFIG   "ospfd.conf"
@@ -796,7 +797,7 @@ extern int q_spaces_compare_func(const struct q_space *a,
 /*
 @sqsq
 */
-extern bool check_time(const struct ospf *ospf);
+extern bool check_lofi(const struct ospf *ospf);
 
 extern struct in_addr sqsq_get_neighbor_intf_ip(struct in_addr current_ip);
 

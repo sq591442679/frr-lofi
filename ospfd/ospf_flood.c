@@ -822,10 +822,10 @@ int ospf_flood_through(struct ospf *ospf, struct ospf_neighbor *inbr,
 		 */
 		if (lsa->data->type == OSPF_ROUTER_LSA) {
 			struct router_lsa *tmp_lsa = (struct router_lsa *)(lsa->data);
-			if (check_time(ospf) && tmp_lsa->ttl <= 1) {
+			if (check_lofi(ospf) && tmp_lsa->ttl <= 1) {
 				lsa_ack_flag = 1;
 			}
-			else if (check_time(ospf) && tmp_lsa->ttl > 1) {
+			else if (check_lofi(ospf) && tmp_lsa->ttl > 1) {
 				// copy this lsa and decrease TTL
 				struct ospf_lsa *lsa_dup = ospf_lsa_dup(lsa); 
 				struct router_lsa *tmp_lsa_dup = (struct router_lsa *)(lsa_dup->data);
