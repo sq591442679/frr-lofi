@@ -50,11 +50,11 @@
 /*
  * sqsq
  */
-#define OSPF_SQSQ_TTL			2U
-#define IS_OSPF					true
+#define OSPF_SQSQ_TTL			0U
+#define IS_OSPF					false
 
 /* @sqsq */
-#define WARMUP_PERIOD			3
+#define WARMUP_PERIOD			0  // NOTE need to be synchronised with emulator/common.py
 
 /* Default configuration file name for ospfd. */
 #define OSPF_DEFAULT_CONFIG   "ospfd.conf"
