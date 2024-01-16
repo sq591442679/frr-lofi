@@ -661,12 +661,69 @@ int ospf_flood_through_interface(struct ospf_interface *oi,
 	return 0;
 }
 
+
+/** 
+ * @sqsq 
+ * should be called before really conducting flood through area.
+ * if LoFi is activated and lsa should be disseminated, then its ttl will be decreased
+ * returns true if can disseminate lsa, false if cannot.
+*/
+int local_disseminate(struct ospf_area *area, struct ospf_neighbor *inbr, struct ospf_lsa *lsa)
+{
+	/**
+	 * @sqsq
+	 * if the ttl of lsa <= 1, then do not flood it out,
+	 * but still need to return 1,
+	 * because the ospf_flood() function needs to send back an LSACK
+	 */
+	if (lsa->data->type == OSPF_ROUTER_LSA) {
+		struct router_lsa *r_lsa = (struct router_lsa *)(lsa->data);
+		struct ospf *ospf = area->ospf;
+		if (check_lofi(ospf)) {
+			uint8_t ttl = r_lsa->ttl;
+			if (ttl > 0) {
+				/**
+				 * when receives/originates an LSA, fisrt check TTL
+				 * if TTL > 0, then decrease and flood
+				 * in other words, receiving/originating LSAs with TTL=0 is valid
+				 * receiving/originating LSAs with TTL=0 means current router should update LSDB accorindly,
+				 * but no further disseminate
+				 */
+				r_lsa->ttl--;
+				lsa->data->checksum = ospf_lsa_checksum(lsa->data);
+				return true;
+			}
+			else {
+				// should not flood
+				return false;
+			}
+		}
+		else {
+			return true;
+		}	
+	}
+	else {
+		return true;
+	}
+}
+
+
 int ospf_flood_through_area(struct ospf_area *area, struct ospf_neighbor *inbr,
 			    struct ospf_lsa *lsa)
 {
 	struct listnode *node, *nnode;
 	struct ospf_interface *oi;
 	int lsa_ack_flag = 0;
+
+	/** 
+	 * @sqsq 
+	 * when conducting local_disseminate(),
+	 * TTL (if any) is decreased internaly
+	 * */
+	if (!local_disseminate(area, inbr, lsa)) {
+		lsa_ack_flag = 1;
+		return lsa_ack_flag;
+	}
 
 	assert(area);
 	/* All other types are specific to a single area (Area A).  The
@@ -814,35 +871,7 @@ int ospf_flood_through(struct ospf *ospf, struct ospf_neighbor *inbr,
 			zlog_debug("%s: LOCAL NSSA FLOOD of Type-7.", __func__);
 	/* Fallthrough */
 	default:
-		/**
-		 * @sqsq
-		 * if the ttl of lsa <= 1, then do not flood it out,
-		 * but still need to return 1,
-		 * because the ospf_flood() function needs to send back an LSACK
-		 */
-		if (lsa->data->type == OSPF_ROUTER_LSA) {
-			struct router_lsa *tmp_lsa = (struct router_lsa *)(lsa->data);
-			if (check_lofi(ospf) && tmp_lsa->ttl <= 1) {
-				lsa_ack_flag = 1;
-			}
-			else if (check_lofi(ospf) && tmp_lsa->ttl > 1) {
-				// copy this lsa and decrease TTL
-				struct ospf_lsa *lsa_dup = ospf_lsa_dup(lsa); 
-				struct router_lsa *tmp_lsa_dup = (struct router_lsa *)(lsa_dup->data);
-				tmp_lsa_dup->ttl--;
-				lsa_dup->data->checksum = ospf_lsa_checksum(lsa_dup->data);  // recalculate the checksum
-				lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa_dup);
-			}
-			else {
-				lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa);
-			}	
-		}
-		else {
-			lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa);
-		}
-		
-
-		// lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa);
+		lsa_ack_flag = ospf_flood_through_area(lsa->area, inbr, lsa);
 		break;
 	}
 
