@@ -1927,6 +1927,7 @@ void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 			}
 			else {
 				struct route_table *tmp_table = route_table_init();
+				listnode_add(new_table->child_table_list, tmp_table);
 				
 				// calculate tmp_table
 				ospf_spf_calculate(area, neighbor_lsa, tmp_table, all_rtrs, new_rtrs, false, true);
@@ -1979,6 +1980,7 @@ void ospf_spf_calculate_area(struct ospf *ospf, struct ospf_area *area,
 				}
 
 				// do I need to free here?
+				// UPDATE: maybe not, added member child_table_list in struct route_table
 				// ospf_route_table_free(tmp_table);
 			}
 		}
