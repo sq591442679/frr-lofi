@@ -727,7 +727,7 @@ void ospf_router_lsa_body_set(struct stream **s, struct ospf_area *area)
 	/**
 	 * @sqsq
 	 */
-	stream_putc(*s, OSPF_SQSQ_TTL);
+	stream_putc(*s, lofi_n);
 
 	/* Keep pointer to # links. */
 	putp = stream_get_endp(*s);

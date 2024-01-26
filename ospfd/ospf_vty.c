@@ -234,6 +234,35 @@ DEFUN_NOSH (router_ospf,
 	return ret;
 }
 
+/**
+ * @sqsq
+ * set lofi n
+ */
+DEFUN (
+	set_lofi_n,
+	set_lofi_n_cmd,
+	"lofi [0-16]",
+	"Set the LoFi parameter n"
+)
+{
+	int idx = 0;
+	uint32_t n = 0;
+
+	// get arguments
+	char *n_str = NULL;
+
+	argv_find(argv, argc, "(1-65535)", &idx);
+	n_str = argv[idx]->arg;
+	n = strtol(n_str, NULL, 10);
+
+	lofi_n = n;
+
+	zlog_debug("%s lofi_n:%d", __func__, lofi_n);
+
+	return CMD_SUCCESS;
+}
+
+
 DEFUN (no_router_ospf,
        no_router_ospf_cmd,
        "no router ospf [{(1-65535)|vrf NAME}]",

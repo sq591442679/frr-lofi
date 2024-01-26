@@ -50,7 +50,7 @@
 /*
  * sqsq
  */
-#define OSPF_SQSQ_TTL			5U
+u_int32_t	lofi_n;
 #define IS_OSPF					false
 
 /* @sqsq */
